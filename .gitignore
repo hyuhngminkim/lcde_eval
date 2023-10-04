@@ -9,3 +9,6 @@ cmake-*
 # Build directory.
 build/
 out/
+data/
+results/
+write_results/

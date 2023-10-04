@@ -20,7 +20,7 @@ val_size=64
 
 nops=10000000
 
-for index in LCDE BOURBON; do 
+for index in WISCKEY RS PGM CHT LCDE BOURBON; do 
   rm -rf build
   mkdir build
   cd build

@@ -22,8 +22,9 @@
 #endif
 
 #ifdef RS
-#include "./competitors/RadixSpline/include/rs/builder.h"
-#include "./competitors/RadixSpline/include/rs/radix_spline.h"
+// #include "./competitors/RadixSpline/include/rs/common.h"
+#include "./competitors/rs/include/rs/builder.h"
+#include "./competitors/rs/include/rs/radix_spline.h"
 #endif
 
 #ifdef PGM
@@ -115,7 +116,7 @@ namespace adgMod {
 #ifdef PGM
         std::vector<size_t> pgm_max_error = 
         {4, 8, 16, 32, 64, 256, 1024, 2048, 4096, 8192};
-        PGMIndex<uint64_t, INDEX_VARIANT, 4> pgm_;
+        PGMIndex<uint64_t, 4, 4> pgm_;
 #endif
 
 #ifdef CHT

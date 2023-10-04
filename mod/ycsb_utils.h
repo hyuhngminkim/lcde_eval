@@ -105,7 +105,7 @@ inline std::string Trim(const std::string &str) {
 template <typename T> 
 std::vector<T> load_data(const std::string& filename) {
   std::vector<T> data;
-  std::ifstream in("/home/host/projects/lcde/data/" + filename, std::ios::binary);
+  std::ifstream in("../data/" + filename, std::ios::binary);
   if (!in.is_open()) {
     std::cerr << "unable to open " << filename << std::endl;
     exit(EXIT_FAILURE);
