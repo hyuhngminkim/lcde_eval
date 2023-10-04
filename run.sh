@@ -18,7 +18,7 @@ val_size=64
 
 nops=10000
 
-index=LCDE
+index=CHT
 
 # Main execution code
 index_option=INDEX_${index}
