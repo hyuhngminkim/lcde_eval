@@ -1,9 +1,0 @@
-[submodule "mod/competitors/CHT"]
-	path = mod/competitors/CHT
-	url = https://github.com/stoianmihail/CHT.git
-[submodule "mod/competitors/PGM-index"]
-	path = mod/competitors/PGM-index
-	url = https://github.com/gvinciguerra/PGM-index.git
-[submodule "mod/competitors/RadixSpline"]
-	path = mod/competitors/RadixSpline
-	url = https://github.com/learnedsystems/RadixSpline.git
