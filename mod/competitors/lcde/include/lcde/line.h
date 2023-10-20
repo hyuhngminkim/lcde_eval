@@ -51,6 +51,7 @@ static void line_lcd(LCD& lcd, VectorT<mpf>& x, const VectorT<int>& w,
     // ERROR
     if (!std::isfinite(temp_lcd.C)) return;
     loglik(temp_lcd, x, w);
+    if (temp_lcd.knot_count() > 5) return;
     if (prev_ll >= temp_lcd.ll) {
       lcd = temp_lcd;
       return;

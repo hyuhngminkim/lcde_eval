@@ -185,7 +185,7 @@ DynamicMatrixT<T> inline cbind(const Eigen::Block<const DynamicMatrixT<T>>& m,
 template <typename T>
 VectorT<T> inline sliceToLast(const VectorT<T>& v, const int& start_index) {
   assert(v.cols() > start_index);
-  return v(Eigen::seq(start_index, Eigen::placeholders::last));
+  return v(Eigen::seq(start_index, Eigen::last));
 }
 
 // Makes a slice from the first element to finish_index
@@ -387,13 +387,13 @@ VectorT<T> inline getElementFromIndex(const VectorT<T>& target,
 template <typename T>
 MatrixT<T> inline getElementFromIndex(const MatrixT<T>& target, 
                                       const std::vector<int>& idx) {
-  return target(Eigen::placeholders::all, idx);
+  return target(Eigen::all, idx);
 }
 
 template <typename T>
 DynamicMatrixT<T> inline getElementFromIndex(const DynamicMatrixT<T>& target, 
                                              const std::vector<int>& idx) {
-  return target(Eigen::placeholders::all, idx);
+  return target(Eigen::all, idx);
 }
 
 // Function designed specifically for indexing from cpk of lcd
@@ -402,7 +402,7 @@ DynamicMatrixT<T>
 inline getElementFromIndex(const Eigen::Block<MatrixT<T>>& target, 
                            const std::vector<int>& idx) {
   DynamicMatrixT<T> res(target.rows(), idx.size());
-  res << target(Eigen::placeholders::all, idx);
+  res << target(Eigen::all, idx);
   return res;
 }
 

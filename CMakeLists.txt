@@ -82,10 +82,14 @@ if (INDEX_LINEAR)
 endif (INDEX_LINEAR)
 
 # https://stackoverflow.com/a/9533742
+# if (NOT DEFINED INDEX_VARIANT)
+#   set(INDEX_VARIANT 0)
+# endif (NOT DEFINED INDEX_VARIANT)
 if (NOT DEFINED INDEX_VARIANT)
-  set(INDEX_VARIANT 0)
+
+else (NOT DEFINED INDEX_VARIANT)
+  add_definitions(-DINDEX_VARIANT=${INDEX_VARIANT})
 endif (NOT DEFINED INDEX_VARIANT)
-add_definitions(-DINDEX_VARIANT=${INDEX_VARIANT})
 
 
 include(TestBigEndian)

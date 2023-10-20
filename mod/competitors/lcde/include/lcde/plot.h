@@ -334,7 +334,7 @@ class TestUnit {
 
       size_t kr = v2.size();
       DynamicMatrixT<mpf> first_kr_transposed = 
-                es.eigenvectors()(Eigen::placeholders::all, Eigen::seqN(0, kr))
+                es.eigenvectors()(Eigen::all, Eigen::seqN(0, kr))
                   .transpose();
       DynamicMatrixT<mpf> R = columnWiseMult(first_kr_transposed, v2);
       VectorT<mpf> p = grad / n + concatenate(-lcd_.alpha, lcd_.pi) * H;

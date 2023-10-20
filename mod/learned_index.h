@@ -98,16 +98,16 @@ namespace adgMod {
 
 #ifdef BOURBON
         // int bb_variant = 7;
-        int bb_variant = INDEX_VARIANT;
-        std::vector<double> bb_configs = 
-        {64, 32, 28, 24, 20, 16, 12, 8, 4, 2};
         std::vector<Segment> string_segments;
         const size_t segment_size = sizeof(uint64_t) + 2 * sizeof(double);
 #endif
 
 #ifdef RS
-        // int rs_variant = 2;
-        int rs_variant = INDEX_VARIANT;
+#ifdef INDEX_VARIANT
+        int rs_variant = INDEX_VARIANT
+#else
+        int rs_variant = 2;
+#endif
         rs::RadixSpline<uint64_t> rs_;
         std::vector<std::pair<size_t, size_t>> rs_configs = 
         {{4, 8192}, {8, 4096}, {10, 2048}, {14, 512}, {20, 320}, {20, 160}, {24, 40}, {24, 20}, {26, 8}, {26, 3}};
@@ -116,12 +116,19 @@ namespace adgMod {
 #ifdef PGM
         std::vector<size_t> pgm_max_error = 
         {4, 8, 16, 32, 64, 256, 1024, 2048, 4096, 8192};
+#ifdef INDEX_VARIANT
+        PGMIndex<uint64_t, INDEX_VARIANT, 4> pgm_;
+#else
         PGMIndex<uint64_t, 4, 4> pgm_;
+#endif
 #endif
 
 #ifdef CHT
-        int cht_variant = INDEX_VARIANT;
-        // int cht_variant = 4;
+#ifdef INDEX_VARIANT
+        int cht_variant = INDEX_VARIANT
+#else
+        int cht_variant = 4;
+#endif
         cht::CompactHistTree<uint64_t> cht_;
         std::vector<std::pair<size_t, size_t>> cht_configs = 
         {{8, 2048}, {16, 2048}, {16, 1024}, {32, 1024}, {32, 512}, {64, 256}, {64, 128}, {64, 32}, {64, 16}, {1024, 16}};

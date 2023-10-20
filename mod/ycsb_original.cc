@@ -161,15 +161,6 @@ int main(int argc, char *argv[]) {
   cout << "index:BOURBON" << endl;
   index_name = "bourbon";
   adgMod::MOD = 7;
-
-  std::vector<double> bb_configs = {64, 32, 28, 24, 20, 16, 12, 8, 4, 2};
-  // int bb_variant_idx;
-#ifdef INDEX_VARIANT
-  int bb_variant_idx = INDEX_VARIANT
-#else
-  int bb_variant_idx = 7;
-#endif
-  file_model_error = bb_configs[bb_variant_idx];
 #endif
 #ifdef RS
   cout << "index:RS" << endl;
@@ -199,7 +190,7 @@ int main(int argc, char *argv[]) {
   // configure db location
   int index_variant;
 #ifdef INDEX_VARIANT
-  index_variant = INDEX_VARIANT
+  index_variant = INDEX_VARIANT;
 #else
   index_variant = 0;
 #endif
@@ -323,6 +314,7 @@ int main(int argc, char *argv[]) {
       case Random: {
         std::random_shuffle(keys.begin(), keys.end());
         for (int i = 0; i < (int)keys.size(); ++i) {
+          if (keys[i] =="0224184788660671") cout << "It's in bro...\n";
           status = db->Put(write_options, keys[i], generate_value(uniform_dist_value(e2)));
           assert(status.ok() && "File Put Error");
         }
@@ -410,11 +402,11 @@ int main(int argc, char *argv[]) {
     //     current->learned_index_data_[i]->ReportStats();
     //   }
 
-      // cout << "\n===== Report file stats =====" << endl;
-      // for (auto it : file_stats) {
-      //   printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
-      //     it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
-      // }
+    //   cout << "\n===== Report file stats =====" << endl;
+    //   for (auto it : file_stats) {
+    //     printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
+    //       it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
+    //   }
 
     //   cout << "\n===== Report learn CB model =====" << endl;
     //   adgMod::learn_cb_model->Report();
@@ -531,7 +523,7 @@ int main(int argc, char *argv[]) {
     std::cerr << "Unknown request distribution: " << request_dist << endl;
     exit(1);
   }
-  scan_len_chooser_ = new ycsbc::UniformGenerator(1, 100);
+  scan_len_chooser_ = new ycsbc::UniformGenerator(0, 100);
 
   // Generate dummy keys for inserts
   uint64_t max_uint_key = std::stoull(keys[keys.size() - 1]) + 1;
@@ -545,12 +537,13 @@ int main(int argc, char *argv[]) {
                             // not inserted keys
   string op_key;            // actual key value to be queried
   string op_value;          // placeholder for read or inserted value
-  int scan_len;             // scan length
+  int scan_len = 100; // scan 100 entries
   uint64_t wrong_ops = 0;
-
-  instance->StartTimer(13);
-
   for (int i = 0; i < num_operations; ++i) {
+    // if (start_new_event) {
+    //   detailed_times.push_back(instance->GetTime());
+    //   start_new_event = false;
+    // }
     do {
       key_idx = key_chooser_->Next();
     } while (key_idx > transaction_insert_key_sequence_->Last()); 
@@ -559,35 +552,48 @@ int main(int argc, char *argv[]) {
     // cout << op_key;
     scan_len = scan_len_chooser_->Next();
 
+    instance->StartTimer(13);
+
     switch (op_chooser_.Next()) {
       case READ: {
         instance->StartTimer(4);
-        string read_op_value;
-        status = db->Get(read_options, op_key, &read_op_value);
+        status = db->Get(read_options, op_key, &op_value);
         instance->PauseTimer(4);
         if (!status.ok()) {
+          // cout << "KeyNotFound(READ)  : iteration " << i << ", " \
+          //     << "key index " << key_idx << endl;
           ++wrong_ops;
         }
         break;
       }
       case UPDATE: {
+        op_value = generate_value(uniform_dist_value(e2));
         instance->StartTimer(10);
-        string update_op_value = generate_value(uniform_dist_value(e2));
-        status = db->Put(write_options, op_key, update_op_value);
+        status = db->Put(write_options, op_key, op_value);
         instance->PauseTimer(10);
         if (!status.ok()) {
+          // cout << "UpdateFail(UPDATE) : iteration " << i << ", " \
+          //     << "key index " << key_idx << endl;
           ++wrong_ops;
         }
         break;
       }
       case INSERT: {
+        // cout << " insert ";
+        // tmp_key_idx = key_idx + 1;
+        // op_key = ycsbc::utils::average_keys(op_key, keys[tmp_key_idx]);
+        op_key = to_string(max_uint_key++);
+        op_key = generate_key2(op_key);
+        // cout << " insert ";
+        op_value = generate_value(uniform_dist_value(e2));
+        // cout << " insert ";
         instance->StartTimer(10);
-        string insert_tmp_max_key = to_string(++max_uint_key);
-        string insert_op_key = generate_key2(insert_tmp_max_key);
-        string insert_op_value = generate_value(uniform_dist_value(e2));
-        status = db->Put(write_options, insert_op_key, insert_op_value);
+        status = db->Put(write_options, op_key, op_value);
+        // cout << " insert ";
         instance->PauseTimer(10);
         if (!status.ok()) {
+          // cout << "InsertFail(INSERT) : iteration " << i << ", " \
+          //     << "key index " << key_idx << endl;
           ++wrong_ops;
         }
         break;
@@ -595,13 +601,10 @@ int main(int argc, char *argv[]) {
       case SCAN: {
         instance->StartTimer(17);
         leveldb::Iterator *db_iter = db->NewIterator(read_options);
-        vector<string> scan_result_vector;
+        vector<string> tmp_result_vector;
         db_iter->Seek(op_key);
         for (int j = 0; db_iter->Valid() && j < scan_len; ++j) {
-          string get_result;
-          string get_key = db_iter->key().ToString();
-          db->Get(read_options, get_key, &get_result);
-          scan_result_vector.push_back(get_result);
+          tmp_result_vector.push_back(db_iter->value().ToString());
           db_iter->Next();
         }
         delete db_iter;
@@ -611,20 +614,23 @@ int main(int argc, char *argv[]) {
       case READMODIFYWRITE: {
         // read
         instance->StartTimer(4);
-        string read_op_value;
-        status = db->Get(read_options, op_key, &read_op_value);
+        status = db->Get(read_options, op_key, &op_value);
         instance->PauseTimer(4);
         if (!status.ok()) {
+          // cout << "KeyNotFound(RMW)   : iteration " << i << ", " \
+          //     << "key index " << key_idx << endl;
           ++wrong_ops;
           break;
         }
         // modify
-        string write_op_value = generate_value(uniform_dist_value(e2));
+        op_value = generate_value(uniform_dist_value(e2));
         // write
         instance->StartTimer(10);
-        status = db->Put(write_options, op_key, write_op_value);
+        status = db->Put(write_options, op_key, op_value);
         instance->PauseTimer(10);
         if (!status.ok()) {
+          // cout << "InsertFail(RMW)    : iteration " << i << ", " \
+          //     << "key index " << key_idx << endl;
           ++wrong_ops;
         }
         break;
@@ -634,9 +640,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
       }
     }
+    instance->PauseTimer(13, true);
   }
-
-  instance->PauseTimer(13, true);
 
   cout << "Correct : " << num_operations << " Wrong : " << wrong_ops << " Wrong ratio : " << (double)wrong_ops / (double)num_operations << endl;
 

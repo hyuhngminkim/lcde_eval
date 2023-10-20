@@ -10,5 +10,14 @@ cmake-*
 build/
 out/
 data/
+
+# Benchmark results.
 results/
 write_results/
+workloada/
+workloadb/
+workloadc/
+workloadd/
+workloade/
+workloadf/
+ycsb_benchmark_results/

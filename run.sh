@@ -25,7 +25,7 @@ index_option=INDEX_${index}
 cmake .. -DCMAKE_BUILD_TYPE=Release -D${index_option}=ON
 make -j 8 ycsb
 
-for wl in workloadc; do
+for wl in workloada workloadb workloadc workloadd workloade workloadf; do
   sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
   echo "${index} write"
   until ./ycsb --print -w --dataset ${dataset} > ../write_results/write_${index}_${wl}_${curtime}.txt

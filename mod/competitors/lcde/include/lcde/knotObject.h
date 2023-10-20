@@ -42,7 +42,7 @@ class Knot {
     std::cout << "\033[1;91;47m                                 \033[m\n\n";
   } 
 
-  size_t getSize() const {
+  static size_t getSize() {
     return sizeof(mpf) * 4 + sizeof(long);
   }
 };      // class Knot
@@ -113,8 +113,7 @@ class KnotObject {
 
   size_t getSize() const {
     size_t model_size = sizeof(mpf) * 2 + sizeof(long);
-    Knot k;
-    size_t knot_size = k.getSize();
+    size_t knot_size = Knot::getSize();
     for (const auto& knot_vector : knots) {
       model_size += knot_size * knot_vector.size();
     }

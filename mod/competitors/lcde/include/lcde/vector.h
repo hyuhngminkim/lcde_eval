@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cmath>
 #include <type_traits>
+
 // #include <boost/multiprecision/eigen.hpp>
 // #include <boost/multiprecision/gmp.hpp>
 #include <Eigen/Dense>
@@ -12,7 +13,6 @@
 namespace lcde {
 
 // using mpf = boost::multiprecision::mpf_float_50;
-// using mpf = long double;
 using mpf = double;
 
 // Basic typedefs. 

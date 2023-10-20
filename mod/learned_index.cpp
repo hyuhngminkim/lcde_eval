@@ -97,7 +97,7 @@ bool LearnedIndexData::Learn() {
   // actual training
 #ifdef LCDE
   lcde::BuilderObject<uint64_t> bo = lcde::BuilderObject<uint64_t>(ko);
-  std::vector<double> params = {1, 1000};
+  std::vector<double> params = {1, 100};
   bo.build(string_keys, params);
   learned.store(true);
 
@@ -105,8 +105,8 @@ bool LearnedIndexData::Learn() {
 #endif
 
 #ifdef BOURBON
-  // PLR plr = PLR(error);
-  PLR plr = PLR(bb_configs[bb_variant]);
+  PLR plr = PLR(error);
+  // PLR plr = PLR(8);
   std::vector<Segment> segs = plr.train(string_keys, !is_level);
   if (segs.empty()) return false;
   // fill in a dummy last segment (used in segment binary search)
@@ -288,7 +288,7 @@ void LearnedIndexData::WriteModelBinary(const string& filename) {
     return;
   }
 
-  std::cout << "Size of data being learned : " << string_keys.size() << std::endl;
+  // std::cout << "Size of data being learned : " << string_keys.size() << std::endl;
 
   output_file.write(reinterpret_cast<char*>(&adgMod::block_num_entries), sizeof(uint64_t));
   output_file.write(reinterpret_cast<char*>(&adgMod::block_size), sizeof(uint64_t));
@@ -648,7 +648,7 @@ void FileLearnedIndexData::Report() {
   for (size_t i = 0; i < file_learned_index_data.size(); ++i) {
     auto pointer = file_learned_index_data[i];
     if (pointer != nullptr && pointer->cost != 0) {
-      // printf("FileModel %lu %d ", i, i > watermark);
+      printf("FileModel %lu %d \n", i, i > watermark);
       accumulated_file_model_size += pointer->ReportStats();
     }
   }

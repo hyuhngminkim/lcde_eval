@@ -98,10 +98,6 @@ class LCD {
     }
   }
 
-  LCD(bool dummy) {
-
-  }
-
   void simplify() {
     std::vector<int> nzi_base;        // non zero index
     std::vector<int> nzi_pk;          // non zero index for dpk and cpk
@@ -171,6 +167,10 @@ class LCD {
 
     std::cout << approx_memory << " bytes\n";
     return;
+  }
+
+  size_t knot_count() const {
+    return theta.cols() + 2;
   }
 };        // class LCD
 

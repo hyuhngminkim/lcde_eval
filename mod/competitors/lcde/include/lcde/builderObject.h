@@ -34,11 +34,21 @@ class BuilderObject {
   BuilderObject(KnotObject<KeyType>& _ko) : KO(_ko) {}
 
   private:
+  // The block size of the permanent storage
+  // Subject to change according to the input parameter
+  int block_size = 4096;
+  // Maximum knot count per segmentation
+  const size_t max_knot_count = 5;
+  // Size of a single "knot" of a Knot
+  const size_t knot_size = Knot::getSize();
+  // Size of level1 parameters
+  const size_t level1_size = sizeof(mpf) * 2 + sizeof(long);
+
   // The sampling ratio
   double sampling_rate;
-  // The number of second layer lcds => Under test
+  // The number of second layer lcds
   long fanout;
-  // Minimum number of elements for an estimation => Under test
+  // Minimum number of data elements for an estimation
   const unsigned long min_size = 3;
   // Slope and intercept for the linear regression of the first layer
   mpf slope;
@@ -50,13 +60,18 @@ class BuilderObject {
     point(mpf lhs, mpf rhs) : x(lhs), y(rhs) {}
   };
   // For storing sampled data and their sample density
-  // std::vector<point> sample_data;
+  std::vector<point> sample_data;
 
   mpf current_base = 0;
   mpf current_ratio = 0;
   long data_size;
 
   KnotObject<KeyType>& KO;
+
+  void calculate_fanout() {
+    fanout = static_cast<long>((block_size - level1_size) / (max_knot_count * knot_size));
+    std::cout << "fanout : " << fanout << std::endl;
+  }
 
   inline std::vector<mpf> convertToSTL(const VectorT<mpf>& v) {
     std::vector<mpf> res(v.data(), v.data() + v.size());
@@ -152,7 +167,7 @@ class BuilderObject {
   public:
   // Build LCDE into a single object. 
   void buildSingle(const std::vector<point>& data) {
-    int max_iter = 0;
+    int max_iter = 100;
     mpf tol = 1e-6;      // experimental changes
     auto data_size = data.size();
     VectorT<mpf> x(data_size);
@@ -184,7 +199,7 @@ class BuilderObject {
 
     // main loop
     for (int i = 0; i < max_iter; ++i) {
-      if (lcd_.ll <= ll_old + tol) break;
+      if (lcd_.ll <= ll_old + tol || lcd_.knot_count() > max_knot_count) break;
       ll_old = lcd_.ll;
       VectorT<mpf> g_theta = maxima_gradient(lcd_, x, w, xx);
 
@@ -242,7 +257,7 @@ class BuilderObject {
 
       size_t kr = v2.size();
       DynamicMatrixT<mpf> first_kr_transposed = 
-                es.eigenvectors()(Eigen::placeholders::all, Eigen::seqN(0, kr))
+                es.eigenvectors()(Eigen::all, Eigen::seqN(0, kr))
                   .transpose();
       DynamicMatrixT<mpf> R = columnWiseMult(first_kr_transposed, v2);
       VectorT<mpf> p = grad / n + concatenate(-lcd_.alpha, lcd_.pi) * H;
@@ -270,7 +285,8 @@ class BuilderObject {
   void build(const std::vector<KeyType>& data, std::vector<double> params) {
     // Set parameters
     sampling_rate = params[0];
-    fanout = static_cast<long>(params[1]);
+    calculate_fanout();
+    // fanout = static_cast<long>(params[1]);
     data_size = data.size();
 
     const long input_size = data.size();
@@ -281,48 +297,28 @@ class BuilderObject {
     slope = 1. / static_cast<mpf>(data.back() - data.front());
     intercept = -slope * static_cast<mpf>(data.front());
 
-    slope *= fanout - 1;
-    intercept *= fanout - 1;
+    slope *= fanout;
+    intercept *= fanout;
 
-    // sample_data.reserve(sample_size);
+    sample_data.reserve(sample_size);
 
     long offset = static_cast<long>(1. * input_size / sample_size);
     std::vector<std::vector<point>> training_data(fanout);
-    // point min, max;
 
     for (long i = 0; i < input_size; i += offset) {
-      // sample_data.push_back({static_cast<mpf>(data[i]), 
-      //                        static_cast<mpf>(1. * (i) / input_size)});
       long rank = static_cast<long>(slope * data[i] + intercept);
       rank = std::max(0L, std::min(fanout - 1, rank));
       training_data[rank].push_back({static_cast<mpf>(data[i]),
                                      static_cast<mpf>(1. * (i) / input_size)});
     }
 
-    // Train first layer 
-    // point min = sample_data.front();
-    // point max = sample_data.back();
+    // Build first layer 
     point min = training_data.front().front();
     point max = training_data.back().back();
 
-    // slope = 1. / (max.x - min.x);
-    // intercept = -slope * min.x;
-
-    // slope *= fanout - 1;
-    // intercept *= fanout - 1;
-
-    // 0912 TEST
     KO.setParameters(slope, intercept, data_size, fanout);
 
-    // Allocate memory for second layer
-    
-    // for (const auto& d : sample_data) {
-    //   long rank = static_cast<long>(slope * d.x + intercept);
-    //   rank = std::max(0L, std::min(fanout - 1, rank));
-    //   training_data[rank].push_back(d);
-    // }
-
-    // Train each subdata 
+    // Learn each subdata 
     for (long model_idx = 0; model_idx < fanout; ++model_idx) {
       std::vector<point>& current_training_data = training_data[model_idx];
       size_t current_training_data_size = current_training_data.size();
