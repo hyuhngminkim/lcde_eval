@@ -62,7 +62,7 @@ namespace adgMod {
     void Stats::ReportTime() {
         std::vector<std::string> names(timers.size(), "null");
         names = {
-            "file lookup time in within one level",
+            "file lookup time within one level",
             "file reading time, table_cache.cc",
             "file model inference time, table_cache.cc",
             "key search time in file - first search",

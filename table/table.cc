@@ -215,13 +215,13 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
   ParseInternalKey(k, &parsed_key);
 
 
-#ifdef INTERNAL_TIMER
-    instance->StartTimer(2);
-#endif
+// #ifdef INTERNAL_TIMER
+//     instance->StartTimer(2);
+// #endif
     iiter->Seek(k);
-#ifdef INTERNAL_TIMER
-    instance->PauseTimer(2);
-#endif
+// #ifdef INTERNAL_TIMER
+//     instance->PauseTimer(2);
+// #endif
 
     if (iiter->Valid()) {
 #ifdef INTERNAL_TIMER

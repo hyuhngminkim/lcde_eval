@@ -138,6 +138,7 @@ namespace adgMod {
     extern string index_name;
     // name of the dataset. default = osm_cellids_200K_uint64
     extern string dataset_name;
+    extern bool save_file_model;
 }
 
 

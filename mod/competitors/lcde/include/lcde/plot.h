@@ -81,7 +81,21 @@ class TestUnit {
     mpf intercept;
     mpf theta;
     mpf addend;
+    long error;
+
+    public:
+    static size_t getSize() {
+      return sizeof(mpf) * 4 + sizeof(long);
+    }
   };
+
+  // The block size of the permanent storage
+  // Subject to change according to the input parameter
+  int block_size = 4 * 1024;
+  // Size of a single "knot" of a Knot
+  const size_t knot_size = knotObject::getSize();
+  // Size of level1 parameters
+  const size_t level1_size = sizeof(mpf) * 2 + sizeof(long);
 
   // Struct cdfPoint is used to reduce the memory consumption.
   // However, memory consumption is not a matter in this testing environment.
@@ -176,7 +190,16 @@ class TestUnit {
       knots.push_back(t_ko);
     }
 
-    void printJSON(const std::string& dataset) {
+    void getSize() const {
+      size_t model_size = tu->level1_size;
+      size_t knot_size = tu->knot_size;
+      for (const auto& knot_vector : knots) {
+        model_size += knot_size * knot_vector.size();
+      }
+      std::cout << "\nSize of index : " << model_size << std::endl;
+    }
+
+    void printJSON(const std::string& dataset) const {
       std::ofstream file;
       std::string filename = "parameters/" + dataset + "_plot_parameters.json";
       file.open(filename);
@@ -243,9 +266,9 @@ class TestUnit {
 
   public:
   // Build LCDE into a single object. 
-  void buildSingle(const std::vector<point>& data) {
+  size_t buildSingle(const std::vector<point>& data, size_t budget) {
     int max_iter = 100;
-    mpf tol = 1e-6;      // experimental changes
+    mpf tol = 1e-6;
     auto data_size = data.size();
     VectorT<mpf> x(data_size);
     VectorT<int> w(data_size);
@@ -257,7 +280,8 @@ class TestUnit {
 
     if (nx <= 2) {
       testObject.append();
-      return;
+      // MOD
+      return budget - 1;
     }
 
     mpf lower = x(0);
@@ -276,7 +300,9 @@ class TestUnit {
 
     // main loop
     for (int i = 0; i < max_iter; ++i) {
-      if (lcd_.ll <= ll_old + tol) break;
+      // MOD
+      if (lcd_.ll <= ll_old + tol || lcd_.knot_count() >= budget) break;
+      // if (lcd_.ll <= ll_old + tol) break;
       ll_old = lcd_.ll;
       VectorT<mpf> g_theta = maxima_gradient(lcd_, x, w, xx);
 
@@ -347,21 +373,153 @@ class TestUnit {
       if (vectorIsInvalid(nnls)) break;
 
       // perform line search
-      line_lcd(lcd_, x, w, xx, nnls, ll_old);
+      // MOD
+      line_lcd(lcd_, x, w, xx, nnls, ll_old, budget);
       // remove zero slope changes if exists
       if ((lcd_.pi.array() == 0).any()) lcd_.simplify();
     }
 
     testObject.append(lcd_);
-    return;
+
+    // MOD
+    return (budget >= lcd_.knot_count() ? budget - lcd_.knot_count() : 0);
   }
+  // void buildSingle(const std::vector<point>& data) {
+  // size_t buildSingle(const std::vector<point>& data, size_t budget) {
+  //   int max_iter = 100;
+  //   mpf tol = 1e-6;      // experimental changes
+  //   auto data_size = data.size();
+  //   VectorT<mpf> x(data_size);
+  //   VectorT<int> w(data_size);
+
+  //   weight(data, x, w);
+  //   double lambda = 1e-15;
+  //   int n = data_size;
+  //   int nx = x.cols();
+
+  //   if (nx <= 2) {
+  //     testObject.append();
+  //     return budget - 1;
+  //   }
+
+  //   mpf lower = x(0);
+  //   mpf upper = x(nx - 1);
+  //   VectorT<mpf> theta;
+  //   VectorT<mpf> pi;
+
+  //   LCD lcd_ = LCD(0, lower, upper, theta, pi); 
+  //   if (lower < lcd_.lower) lcd_.lower = lower;
+  //   if (upper > lcd_.upper) lcd_.upper = upper;
+
+  //   VectorT<mpf> xx(x.cols());
+  //   xsq(xx, x, w);
+  //   loglik(lcd_, x, w);
+  //   mpf ll_old = std::numeric_limits<mpf>::lowest();
+
+  //   // main loop
+  //   for (int i = 0; i < max_iter; ++i) {
+  //     if (lcd_.ll <= ll_old + tol || lcd_.knot_count() >= budget) break;
+  //     // if (lcd_.ll <= ll_old + tol) break;
+  //     ll_old = lcd_.ll;
+  //     VectorT<mpf> g_theta = maxima_gradient(lcd_, x, w, xx);
+
+  //     if (g_theta.cols() >= 1) {
+  //       VectorT<mpf> g_pi = VectorT<mpf>::Zero(g_theta.cols());
+  //       int oi = 0;     // index of theta of original lcd
+  //       int ni = 0;     // index of new theta
+  //       while (oi < lcd_.theta.cols()) {
+  //         if (lcd_.theta(oi) == g_theta(ni)) g_pi(ni) = lcd_.pi(oi++);
+  //         ++ni;
+  //       }
+  //       lcd_ = LCD(lcd_.alpha, lcd_.lower, lcd_.upper, g_theta, g_pi);
+  //     }
+
+  //     VectorT<mpf>& knots = lcd_.knots;
+  //     MatrixT<mpf>& cpk = lcd_.cpk;
+
+  //     int nk = knots.cols();
+
+  //     MatrixT<mpf> cpkr = getElementFromIndex(cpk, {nk - 1}).replicate(1, nk)
+  //                         - cbind(0.0, dropElementByIndex(cpk, nk - 1));
+
+  //     // E{(X - theta)_+}
+  //     VectorT<mpf> mu = cpkr.row(1).array() - knots.array() * cpkr.row(0).array();
+  //     // index of knots against x
+  //     std::vector<int> knots_idx = getIndexOnly(knots, x);
+  //     // gradient vector
+  //     VectorT<mpf> grad = (mu * n) + getElementFromIndex(xx, knots_idx);
+  //     // E{(X - theta_j)_+ (X - theta_k)_+}
+  //     DynamicMatrixT<mpf> mm = computeDiff(knots, cpkr, nk);
+  //     // negative Hessian matrix
+  //     mm.triangularView<Eigen::Upper>() = mm.transpose();
+  //     DynamicMatrixT<mpf> H = mm - tcrossprod(mu);
+
+  //     // Catalogue: 
+  //     // https://eigen.tuxfamily.org/dox/group__TopicLinearAlgebraDecompositions.html
+  //     // https://eigen.tuxfamily.org/dox/classEigen_1_1SelfAdjointEigenSolver.html
+  //     Eigen::SelfAdjointEigenSolver<DynamicMatrixT<mpf>> es(H);
+
+  //     std::vector<mpf> v2;
+  //     std::vector<int> R_idx;
+  //     v2.reserve(nk);
+  //     R_idx.reserve(nk);
+  //     // Note that the eigen() function of R sorts the eigenvalues in decreasing
+  //     // order, but SelfAdjointEigenSolver of Eigen sorts the eigenvalues in
+  //     // increasing order.
+  //     mpf lower_bound = es.eigenvalues()(nk - 1) * lambda;
+  //     for (auto i = 0; i < nk; ++i) {
+  //       auto tmp_ev = std::abs(es.eigenvalues()(i));
+  //       if (tmp_ev != 0 && tmp_ev >= lower_bound) {
+  //         R_idx.push_back(i);
+  //         v2.push_back(sqrt(tmp_ev));
+  //       }
+  //     }
+
+  //     size_t kr = v2.size();
+  //     DynamicMatrixT<mpf> first_kr_transposed = 
+  //               es.eigenvectors()(Eigen::all, Eigen::seqN(0, kr))
+  //                 .transpose();
+  //     DynamicMatrixT<mpf> R = columnWiseMult(first_kr_transposed, v2);
+  //     VectorT<mpf> p = grad / n + concatenate(-lcd_.alpha, lcd_.pi) * H;
+  //     VectorT<mpf> b = 
+  //     auxiliaryDivision((first_kr_transposed * p.transpose()).transpose(), v2);
+
+  //     VectorT<double> nnls = pnnls(R.cast<double>(), b.cast<double>(), 1);
+  //     nnls(0) = -nnls(0);
+
+  //     if (vectorIsInvalid(nnls)) break;
+
+  //     // perform line search
+  //     line_lcd(lcd_, x, w, xx, nnls, ll_old, budget);
+  //     // remove zero slope changes if exists
+  //     if ((lcd_.pi.array() == 0).any()) lcd_.simplify();
+  //   }
+
+  //   testObject.append(lcd_);
+  //   // return;
+  //   return (budget >= lcd_.knot_count() ? budget - lcd_.knot_count() : 0);
+  // }
 
   // Build LCDE using the standard linear model - fanout structure. 
   // Parameters are brought in as a vector for scalability and testing purposes.
   void build(const std::vector<KeyType>& data, std::vector<double> params) {
     // Set parameters
+    // params[0]: sampling rate
     sampling_rate = params[0];
+    // params[1]: fanout
     fanout = static_cast<long>(params[1]);
+
+    // MOD: strict budget cap
+    size_t size_in_b = (size_t)(params[2] * 1024);
+    if (size_in_b <= level1_size) {
+      std::cerr << "Index size insufficiently small. Aborting...\n";
+      exit(EXIT_FAILURE);
+    }
+    const size_t average = 3;
+    size_t budget = 0;
+    fanout = (size_t)((size_in_b - level1_size)/ (average * knot_size));
+    std::cout << "Fanout : " << fanout << std::endl;
+
     data_size = data.size();
 
     const long input_size = data.size();
@@ -369,34 +527,32 @@ class TestUnit {
       input_size, std::max<long>(sampling_rate * input_size, min_size)
     );
 
+    slope = 1. / static_cast<mpf>(data.back() - data.front());
+    intercept = -slope * static_cast<mpf>(data.front());
+
+    slope *= fanout;
+    intercept *= fanout;
+
     sample_data.reserve(sample_size);
 
     long offset = static_cast<long>(1. * input_size / sample_size);
-    for (long i = 0; i < input_size; i += offset) {
-      sample_data.push_back({static_cast<mpf>(data[i]), 
-                             static_cast<mpf>(1. * (i) / input_size)});
-    }
-
-    // Train first layer 
-    point min = sample_data.front();
-    point max = sample_data.back();
-
-    slope = 1. / (max.x - min.x);
-    intercept = -slope * min.x;
-
-    slope *= fanout - 1;
-    intercept *= fanout - 1;
-
-    // Allocate memory for second layer
     std::vector<std::vector<point>> training_data(fanout);
-    for (const auto& d : sample_data) {
-      long rank = static_cast<long>(slope * d.x + intercept);
+
+    for (long i = 0; i < input_size; i += offset) {
+      mpf cast_data = static_cast<mpf>(data[i]);
+      long rank = static_cast<long>(slope * cast_data + intercept);
       rank = std::max(0L, std::min(fanout - 1, rank));
-      training_data[rank].push_back(d);
+      training_data[rank].push_back({cast_data,
+                                     static_cast<mpf>(1. * (i) / input_size)});
     }
+
+    // Build first layer 
+    point min = training_data.front().front();
+    point max = training_data.back().back();
 
     // Train each subdata 
     for (long model_idx = 0; model_idx < fanout; ++model_idx) {
+      budget += average;
       std::vector<point>& current_training_data = training_data[model_idx];
       size_t current_training_data_size = current_training_data.size();
       // The case for when the current_training_data.size() < 0 is a 
@@ -408,6 +564,7 @@ class TestUnit {
         if (current_training_data_size < min_size) {
           current_training_data.push_back(point(0, 0));
           testObject.append();
+          --budget;
           if (current_training_data_size != 0) {
             current_base += current_training_data[current_training_data_size - 1].y;
           }
@@ -415,30 +572,33 @@ class TestUnit {
           max = current_training_data.back();
 
           current_ratio = max.y;
-          buildSingle(current_training_data);
+          budget = buildSingle(current_training_data, budget);
           current_base += current_ratio;
         }
       } else if (model_idx == fanout - 1) {      // Last model
         if (current_training_data_size < min_size) {
           testObject.append();
+          --budget;
         } else {
           min = training_data[model_idx - 1].back();
 
           current_ratio = 1 - min.y;
-          buildSingle(current_training_data);
+          budget = buildSingle(current_training_data, budget);
         }
       } else {                                    // Intermediate models
         if (current_training_data_size == 0) {
           current_training_data.push_back(training_data[model_idx - 1].back());
           testObject.append();
+          --budget;
         } else {
           min = training_data[model_idx - 1].back();
           max = current_training_data.back();
           current_ratio = max.y - min.y;
           if (current_training_data_size < min_size) {
             testObject.append();
+            --budget;
           } else {
-            buildSingle(current_training_data);
+            budget = buildSingle(current_training_data, budget);
           }
           current_base += current_ratio;
         }
@@ -446,7 +606,11 @@ class TestUnit {
     }
   }
 
-  void printJSON(const std::string& dataset) {
+  void getSize() const {
+    testObject.getSize();
+  }
+
+  void printJSON(const std::string& dataset) const {
     testObject.printJSON(dataset);
   }
 };

@@ -104,13 +104,13 @@ namespace adgMod {
 
 #ifdef RS
 #ifdef INDEX_VARIANT
-        int rs_variant = INDEX_VARIANT
+        int rs_variant = INDEX_VARIANT;
 #else
         int rs_variant = 2;
 #endif
         rs::RadixSpline<uint64_t> rs_;
         std::vector<std::pair<size_t, size_t>> rs_configs = 
-        {{4, 8192}, {8, 4096}, {10, 2048}, {14, 512}, {20, 320}, {20, 160}, {24, 40}, {24, 20}, {26, 8}, {26, 3}};
+        {{4, 8192}, {8, 4096}, {10, 2048}, {12, 1024}, {14, 512}, {16, 256}, {18, 128}, {20, 64}, {22, 32}, {24, 32}};
 #endif
 
 #ifdef PGM
@@ -125,13 +125,14 @@ namespace adgMod {
 
 #ifdef CHT
 #ifdef INDEX_VARIANT
-        int cht_variant = INDEX_VARIANT
+        int cht_variant = INDEX_VARIANT;
 #else
         int cht_variant = 4;
 #endif
         cht::CompactHistTree<uint64_t> cht_;
         std::vector<std::pair<size_t, size_t>> cht_configs = 
-        {{8, 2048}, {16, 2048}, {16, 1024}, {32, 1024}, {32, 512}, {64, 256}, {64, 128}, {64, 32}, {64, 16}, {1024, 16}};
+        {{8, 2048}, {16, 2048}, {16, 1024}, {32, 1024}, {32, 256}, {64, 256}, {64, 128}, {64, 64}, {128, 64}, {128, 32}};
+        // {{8, 2048}, {16, 2048}, {16, 1024}, {32, 1024}, {32, 512}, {64, 256}, {64, 128}, {64, 32}, {64, 16}, {1024, 16}};
 #endif
 
 #ifdef LINEAR

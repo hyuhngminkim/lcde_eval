@@ -11,21 +11,18 @@ cd build
 
 curtime=`date +%m_%d_%H_%M`
 
-dataset=osm_cellids_10M_uint64
+dataset=wiki_ts_50M_uint64
 
-key_size=16
-val_size=64
+nops=1000000
 
-nops=10000
-
-index=CHT
+index=BOURBON
 
 # Main execution code
 index_option=INDEX_${index}
 cmake .. -DCMAKE_BUILD_TYPE=Release -D${index_option}=ON
 make -j 8 ycsb
 
-for wl in workloada workloadb workloadc workloadd workloade workloadf; do
+for wl in workloadc; do
   sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
   echo "${index} write"
   until ./ycsb --print -w --dataset ${dataset} > ../write_results/write_${index}_${wl}_${curtime}.txt

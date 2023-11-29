@@ -906,7 +906,10 @@ namespace leveldb {
     }
 
     VersionSet::~VersionSet() {
-        if (adgMod::fresh_write) current_->WriteLevelModel();
+        if (adgMod::fresh_write || adgMod::save_file_model) {
+            std::cout << "Triggered file model write\n";
+            current_->WriteLevelModel();
+        }
         current_->Unref();
 
         //assert(dummy_versions_.next_ == &dummy_versions_);  // List must be empty
@@ -1776,8 +1779,10 @@ namespace leveldb {
     void Version::WriteLevelModel() {
         //return;
         for (int i = 0; i < config::kNumLevels; ++i) {
+            // std::cout << "Level : " << i << std::endl;
             learned_index_data_[i]->WriteModel(vset_->dbname_ + "/" + to_string(i) + ".model");
             for (FileMetaData *file_meta : files_[i]) {
+                // std::cout << "number : " << file_meta->number << "\n";
                 adgMod::file_data->GetModel(file_meta->number)->WriteModelBinary(
                         vset_->dbname_ + "/" + to_string(file_meta->number) + ".fmodel");
             }

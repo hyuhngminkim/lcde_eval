@@ -155,4 +155,5 @@ namespace adgMod {
 
     string index_name = "wisckey";
     string dataset_name = "osm_cellids_200K_uint64";
+    bool save_file_model = false;
 }

@@ -710,7 +710,14 @@ struct ExpRecursion<T, degree, degree> {
 
 template <typename T>
 T expApprox(T x) {
-  return ExpRecursion<T, 30, 0>::evaluate(x);
+  return ExpRecursion<T, 16, 0>::evaluate(x);
+}
+
+inline mpf exp1(mpf x) {
+  x = 1.0 + x / 64.0;
+  x *= x; x *= x; x *= x; x *= x;
+  x *= x; x *= x;
+  return x;
 }
 
 bool inline vectorIsInvalid(const VectorT<mpf>& vec) {

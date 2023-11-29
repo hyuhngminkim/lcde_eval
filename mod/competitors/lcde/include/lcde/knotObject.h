@@ -51,8 +51,8 @@ template <typename KeyType>
 class KnotObject {
   public:
   KnotObject() = default;
-  KnotObject(mpf a, mpf b, long c, long d)
-   : linear_layer_slope(a), linear_layer_intercept(b), data_size(c), fanout(d) {}
+  KnotObject(mpf slope, mpf intercept, long data_size, long fanout)
+   : linear_layer_slope(slope), linear_layer_intercept(intercept), data_size(data_size), fanout(fanout) {}
 
   mpf linear_layer_slope;
   mpf linear_layer_intercept;
@@ -72,6 +72,13 @@ class KnotObject {
     knots.push_back(k);
   }
 
+  inline mpf exp1a(mpf x) const {
+    x = 1.0 + x / 64.0;
+    x *= x; x *= x; x *= x; x *= x;
+    x *= x; x *= x; x *= x;
+    return x;
+  }
+
   // Initial implementation of find function
   // Currently the fastest implementation
   std::pair<size_t, size_t> findOne(const KeyType& key) const {
@@ -80,32 +87,76 @@ class KnotObject {
 
     const std::vector<Knot>& knot = knots[rank];
 
-    uint error = 0;
-    long search_result = 0;
+    // MODIFIED ////////////////////////////////////////////////////////////////
+    // const mpf tmp_key = std::max(knot[0].theta, std::min(knot[knot.size() - 1].theta, static_cast<mpf>(key)));
+    // auto iter = std::upper_bound(knot.begin(), knot.end(), tmp_key, 
+    // [](const mpf& k, const Knot& ko) {
+    //   return k < ko.theta;
+    // });
+    // iter = std::max(knot.begin(), std::min(iter - 1, knot.end() - 2));
+    // const mpf& a = iter->addend;
+    // const mpf& s = iter->slope;
+    // const mpf& i = iter->intercept;
 
+    // long search_result = data_size * (
+    //   s == 0 ? (std::fma(i, tmp_key, a)) 
+    //         //  : (s > 0 ? (a + exp1(std::fma(s, tmp_key, i))) 
+    //         //           : (a - exp1(std::fma(s, tmp_key, i))))
+    //         //  : (s > 0 ? (a + expApprox<mpf>(std::fma(s, tmp_key, i))) 
+    //         //           : (a - expApprox<mpf>(std::fma(s, tmp_key, i))))
+    //           : (s > 0 ? (a + std::exp(std::fma(s, tmp_key, i))) 
+    //                    : (a - std::exp(std::fma(s, tmp_key, i))))
+    // );
+
+    // const uint& error = iter->error;
+    ////////////////////////////////////////////////////////////////////////////
+
+    // ORIGINAL ////////////////////////////////////////////////////////////////
+    long search_result;
+    long error;
     if (knot.size() == 1) {
-      search_result = data_size * knot[0].addend;
+      search_result = knot[0].addend;
       error = knot[0].error;
     } else {
-      const mpf tmp_key = std::max(knot[0].theta, std::min(knot[knot.size() - 1].theta, static_cast<mpf>(key)));
+      // const mpf tmp_key = std::max(knot[0].theta, std::min(knot[knot.size() - 1].theta, static_cast<mpf>(key)));
+      const mpf tmp_key = static_cast<mpf>(key);
       auto iter = std::upper_bound(knot.begin(), knot.end(), tmp_key, 
       [](const mpf& k, const Knot& ko) {
         return k < ko.theta;
       });
       iter = std::min(iter - 1, knot.end() - 2);
+      // iter = std::max(knot.begin(), std::min(iter - 1, knot.end() - 2));
       const mpf& a = iter->addend;
       const mpf& s = iter->slope;
       const mpf& i = iter->intercept;
       error = iter->error;
 
+      // search_result = data_size * (
+      //   s == 0 ? (std::fma(i, tmp_key, a)) 
+      //         //  : (s > 0 ? (a + exp1(std::fma(s, tmp_key, i))) 
+      //         //           : (a - exp1(std::fma(s, tmp_key, i))))
+      //          : (s > 0 ? (a + expApprox<mpf>(std::fma(s, tmp_key, i))) 
+      //                   : (a - expApprox<mpf>(std::fma(s, tmp_key, i))))
+      //         //  : (s > 0 ? (a + std::exp(std::fma(s, tmp_key, i))) 
+      //         //           : (a - std::exp(std::fma(s, tmp_key, i))))
+      // );
+
       if (s > 0) {
         search_result = static_cast<long>(std::fma(data_size, std::exp(std::fma(s, tmp_key, i)), a));
+        // search_result = static_cast<long>(std::fma(data_size, exp1(std::fma(s, tmp_key, i)), a));
+        // search_result = static_cast<long>(std::fma(data_size, expApprox<mpf>(std::fma(s, tmp_key, i)), a));
       } else if (s < 0) {
         search_result = static_cast<long>(std::fma(data_size, -std::exp(std::fma(s, tmp_key, i)), a));
+        // search_result = static_cast<long>(std::fma(data_size, -exp1(std::fma(s, tmp_key, i)), a));
+        // search_result = static_cast<long>(std::fma(data_size, -expApprox<mpf>(std::fma(s, tmp_key, i)), a));
       } else {
         search_result = static_cast<long>(std::fma(i, key, a));
       }
+      // return std::make_pair(static_cast<size_t>(std::max(search_result - error, 0L)),
+      //                       static_cast<size_t>(std::min(data_size, search_result + error)));
     }
+    ////////////////////////////////////////////////////////////////////////////
+    
 
     return std::make_pair(static_cast<size_t>(std::max(search_result - error, 0L)),
                           static_cast<size_t>(std::min(data_size, search_result + error)));
@@ -126,11 +177,34 @@ class KnotObject {
     std::cout << "Size of individual knot vectors : \n";
     for (auto knotv : knots) {
       for (auto k : knotv) {
-        k.printKnotObject();
+        std::cout << k.error << " ";
+        // k.printKnotObject();
       }
-      std::cout << "_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-\n";
+      std::cout << "\n";
     }
     return;
+  }
+
+  long getError(const KeyType& key) const {
+    long rank = static_cast<long>(std::fma(linear_layer_slope, key, linear_layer_intercept));
+    rank = std::max(0L, std::min(fanout - 1, rank));
+
+    const std::vector<Knot>& knot = knots[rank];
+
+    long error;
+    if (knot.size() == 1) {
+      error = knot[0].error;
+    } else {
+      const mpf tmp_key = static_cast<mpf>(key);
+      auto iter = std::upper_bound(knot.begin(), knot.end(), tmp_key, 
+      [](const mpf& k, const Knot& ko) {
+        return k < ko.theta;
+      });
+      iter = std::min(iter - 1, knot.end() - 2);
+      error = iter->error;
+    }
+
+    return error;
   }
 
 };     // class KnotObject

@@ -20,4 +20,8 @@ workloadc/
 workloadd/
 workloade/
 workloadf/
+writes/
 ycsb_benchmark_results/
+
+# Database directory.
+databases/

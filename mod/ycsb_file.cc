@@ -113,13 +113,13 @@ int main(int argc, char *argv[]) {
     ("file_info", "print the file structure info", cxxopts::value<bool>(print_file_info)->default_value("false"))
     ("test_num_segments", "test: number of segments per level", cxxopts::value<float>(test_num_segments_base)->default_value("1"))
     ("string_mode", "test: use string or int in model", cxxopts::value<bool>(adgMod::string_mode)->default_value("false"))
-    ("file_model_error", "error in file model", cxxopts::value<uint32_t>(adgMod::file_model_error)->default_value("8"))
+    ("file_model_error", "error in file model", cxxopts::value<uint32_t>(adgMod::file_model_error)->default_value("18"))
     ("level_model_error", "error in level model", cxxopts::value<uint32_t>(adgMod::level_model_error)->default_value("1"))
     ("f,input_file", "the filename of input file", cxxopts::value<string>(input_filename)->default_value(""))
     ("multiple", "test: use larger keys", cxxopts::value<uint64_t>(adgMod::key_multiple)->default_value("1"))
     ("c,uncache", "evict cache", cxxopts::value<bool>(evict)->default_value("false"))
     ("u,unlimit_fd", "unlimit fd", cxxopts::value<bool>(unlimit_fd)->default_value("false"))
-    ("l,load_type", "load type", cxxopts::value<int>(load_type)->default_value("0"))
+    ("l,load_type", "load type", cxxopts::value<int>(load_type)->default_value("3"))
     ("filter", "use filter", cxxopts::value<bool>(adgMod::use_filter)->default_value("false"))
     ("change_level_load", "load level model", cxxopts::value<bool>(change_level_load)->default_value("false"))
     ("change_file_load", "enable level learning", cxxopts::value<bool>(change_file_load)->default_value("false"))
@@ -130,7 +130,6 @@ int main(int argc, char *argv[]) {
     ("m,modification", "if set, run our modified version, 7 file-model bourbon, 8 wiskey, 9 ours", cxxopts::value<int>(adgMod::MOD)->default_value("10"))
     ("print", "print all recorded timestamps", cxxopts::value<bool>(print_timestamps)->default_value("false")) 
     ("w,write", "writedb", cxxopts::value<bool>(fresh_write)->default_value("false"))
-    ("z,z_save_file_model", "save the file model", cxxopts::value<bool>(save_file_model)->default_value("false"))
     ("d,directory", "the directory of db", cxxopts::value<string>(db_location)->default_value("/tmp/wisckey_ycsb"))
     ("k,key_size", "the size of key", cxxopts::value<int>(adgMod::key_size)->default_value("16"))
     ("v,value_size", "the size of value", cxxopts::value<int>(adgMod::value_size)->default_value("64"))
@@ -145,8 +144,6 @@ int main(int argc, char *argv[]) {
     std::cout << commandline_options.help() << std::endl;
     exit(0);
   }
-
-  
 
   // // set name to lowercase
   // std::transform(index_name.begin(), index_name.end(), index_name.begin(), tolower);
@@ -202,12 +199,11 @@ int main(int argc, char *argv[]) {
   // configure db location
   int index_variant;
 #ifdef INDEX_VARIANT
-  index_variant = INDEX_VARIANT;
+  index_variant = INDEX_VARIANT
 #else
   index_variant = 0;
 #endif
-  db_location = "../databases/" + index_name + "_ycsb";
-  // db_location = "../databases/" + index_name + "_" + to_string(index_variant) + "_ycsb";
+  db_location = "../databases/" + index_name + "_" + to_string(index_variant) + "_ycsb";
   
   // configure ycsb workload name
   ycsb_workload_name = "../workloads/" + ycsb_workload_name;
@@ -239,34 +235,22 @@ int main(int argc, char *argv[]) {
   cout << "operations:" <<num_operations << endl;
   // load keys from dataset
   vector<uint64_t> sosd_keys = ycsbc::utils::load_data<uint64_t>(dataset_name);
-  cout << "data size:" << sosd_keys.size() << endl;
   // for calculating minimum distance between keys
-  // uint64_t cur_key = 0;
+  uint64_t cur_key = 0;
   // min_distance is used to generate a non-existing key for negative queries
   // or fresh insert transactions
-  // uint64_t min_distance = (uint64_t)1 << 63;
-  // int i = 0;
-  for (int i = 0; i < sosd_keys.size(); ++i) {
-    // sosd_keys[i] >>= 14;
-    uint64_t sosd_key = sosd_keys[i];
-
+  uint64_t min_distance = (uint64_t)1 << 63;
+  for (uint64_t sosd_key : sosd_keys) {
+    sosd_key >>= 14;
+    if (sosd_key - cur_key < min_distance) {
+      min_distance = sosd_key - cur_key;
+    }
+    cur_key = sosd_key;
     string raw_key_string = to_string(sosd_key);
     string the_key = generate_key2(raw_key_string);
     keys.push_back(the_key);
   }
-  // for (uint64_t sosd_key : sosd_keys) {
-  //   // cout << ++i << " ";
-  //   sosd_key >>= 15;
-  //   // if (sosd_key - cur_key < min_distance) {
-  //   //   min_distance = sosd_key - cur_key;
-  //   // }
-  //   // cur_key = sosd_key;
-  //   string raw_key_string = to_string(sosd_key);
-  //   string the_key = generate_key2(raw_key_string);
-  //   keys.push_back(the_key);
-  // }
-  // cout << "Finished loading keys to vector.. ";
-  // exit(EXIT_SUCCESS);
+  
   const bool copy_out = true;
 
   adgMod::Stats* instance = adgMod::Stats::GetInstance();
@@ -298,11 +282,6 @@ int main(int argc, char *argv[]) {
   // Load Dataset
   //////////////////////////////////////////////////////////////////////////////
   if (fresh_write) {
-    ////////////////////////////////////////////////////////////////////////////
-    // Set CPU Affinity
-    ////////////////////////////////////////////////////////////////////////////
-    ycsbc::utils::set_cpu_affinity(21);
-
     ////////////////////////////////////////////////////////////////////////////
     // Declare DB and Options
     ////////////////////////////////////////////////////////////////////////////
@@ -357,44 +336,67 @@ int main(int argc, char *argv[]) {
 
     adgMod::db->vlog->Sync();
     instance->PauseTimer(9, true);
-    // instance->ReportTime();
+    instance->ReportTime();
     cout << "Put Complete" << endl;
 
     if (print_file_info) db->PrintFileInfo();
 
     if (print_timestamps) {
+      // cout << "\n===== Reporting events =====\n";
+      // for (auto& event_array : events) {
+      //   for (Event* e : event_array) e->Report();
+      // }
+
+      // cout << "\n===== Reporting levelled counters =====\n";
+      // for (Counter& c : levelled_counters) c.Report();
 
       cout << "\n===== Reporting file data =====\n";
       file_data->Report();
 
+      // cout << "\n===== Level model stats =====" << endl;
+      // Version* current = adgMod::db->versions_->current();
+      // for (int i = 1; i < config::kNumLevels; ++i) {
+      //   current->learned_index_data_[i]->ReportStats();
+      // }
+
+      // cout << "\n===== Report file stats =====" << endl;
+      // for (auto it : file_stats) {
+      //   printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
+      //     it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
+      // }
+
+      // cout << "\n===== Report learn CB model =====" << endl;
+      // adgMod::learn_cb_model->Report();
     }
-    // instance->ReportTime();
 
 
     ////////////////////////////////////////////////////////////////////////////
     // Offline Learning Phase
     ////////////////////////////////////////////////////////////////////////////
-    adgMod::db->WaitForBackground();
-    delete db;
-    // return 0;
-    // exit(EXIT_SUCCESS);
-    adgMod::fresh_write = false;    // fresh_write = false -> learn file
-    adgMod::save_file_model = true; // save_file_model = true -> save model
+    // adgMod::db->WaitForBackground();
+    // delete db;
+    // status = DB::Open(options, db_location, &db);
+    // adgMod::db->WaitForBackground();
 
-    status = DB::Open(options, db_location, &db);
-    adgMod::db->WaitForBackground();
+    // // Begin offline learning
+    // if (adgMod::MOD == 6 || adgMod::MOD == 7 || adgMod::MOD == 9) {
+    //   Version* current = adgMod::db->versions_->current();
 
-    // Begin offline learning
-    std::cout << "Begin offline learning\n";
-    if (adgMod::MOD == 6 || adgMod::MOD == 7 || adgMod::MOD == 9) {
-      Version* current = adgMod::db->versions_->current();
-      current->FileLearn();
-    }
-    instance->ReportTime();
-    file_data->Report();
+    //   // for (int i = 1; i < config::kNumLevels; ++i) {
+    //   //   LearnedIndexData::LevelLearn(new VersionAndSelf{current, adgMod::db->version_count, current->learned_index_data_[i].get(), i});
+    //   // }
 
-{
+    //   current->FileLearn();
+    // }
+
+    // status = DB::Open(options, db_location, &db);
+    // adgMod::db->WaitForBackground();
+
     // if (print_timestamps) {
+    //   cout << "\n===== Reporting events =====\n";
+    //   for (auto& event_array : events) {
+    //     for (Event* e : event_array) e->Report();
+    //   }
 
     //   cout << "\n===== Reporting levelled counters =====\n";
     //   for (Counter& c : levelled_counters) c.Report();
@@ -408,68 +410,22 @@ int main(int argc, char *argv[]) {
     //     current->learned_index_data_[i]->ReportStats();
     //   }
 
-      cout << "\n===== Report file stats =====" << endl;
-      for (auto it : file_stats) {
-        printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
-          it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
-      }
+      // cout << "\n===== Report file stats =====" << endl;
+      // for (auto it : file_stats) {
+      //   printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
+      //     it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
+      // }
 
     //   cout << "\n===== Report learn CB model =====" << endl;
     //   adgMod::learn_cb_model->Report();
     // }
 
-    // cout << "Offline learning complete... turning off DB" << endl;
-}
+    // // cout << "Offline learning complete... turning off DB" << endl;
     adgMod::db->WaitForBackground();
     delete db;
 
     return 0;
   }
-
-  if (save_file_model) {
-    ////////////////////////////////////////////////////////////////////////////
-    // Set CPU Affinity
-    ////////////////////////////////////////////////////////////////////////////
-    ycsbc::utils::set_cpu_affinity(21);
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Declare DB and Options
-    ////////////////////////////////////////////////////////////////////////////
-    DB* db;
-    Options options;
-    ReadOptions& read_options = adgMod::read_options;
-    WriteOptions& write_options = adgMod::write_options;
-    Status status;
-
-    options.create_if_missing = true;
-    write_options.sync = false;
-    instance->ResetAll();
-
-    // Open DB
-    status = DB::Open(options, db_location, &db);
-    assert(status.ok() && "Open Error");
-
-    status = DB::Open(options, db_location, &db);
-    adgMod::db->WaitForBackground();
-
-    // Begin offline learning
-    std::cout << "Begin offline learning\n";
-    if (adgMod::MOD == 6 || adgMod::MOD == 7 || adgMod::MOD == 9) {
-      Version* current = adgMod::db->versions_->current();
-      current->FileLearn();
-    }
-    file_data->Report();
-    instance->ReportTime();
-
-    adgMod::db->WaitForBackground();
-    delete db;
-
-    return 0;
-  }
-  //////////////////////////////////////////////////////////////////////////////
-  // Set CPU Affinity
-  //////////////////////////////////////////////////////////////////////////////
-  ycsbc::utils::set_cpu_affinity(17);
 
   // for (int iter = 0; iter < num_iteration; ++iter) {
   ////////////////////////////////////////////////////////////////////////////
@@ -595,95 +551,23 @@ int main(int argc, char *argv[]) {
 
   
 
-  for (int i = 0; i < num_operations; ++i) {
-    do {
-      key_idx = key_chooser_->Next();
-    } while (key_idx > transaction_insert_key_sequence_->Last()); 
-    op_key = keys[key_idx];
+  std::ifstream file("../records.txt");
 
-    // cout << op_key;
-    scan_len = scan_len_chooser_->Next();
+  instance->StartTimer(13);
 
-    instance->StartTimer(13);
-
-    switch (op_chooser_.Next()) {
-      case READ: {
-        instance->StartTimer(4);
-        string read_op_value;
-        status = db->Get(read_options, op_key, &read_op_value);
-        instance->PauseTimer(4);
-        if (!status.ok()) {
-          ++wrong_ops;
-        }
-        break;
-      }
-      case UPDATE: {
-        instance->StartTimer(10);
-        string update_op_value = generate_value(uniform_dist_value(e2));
-        status = db->Put(write_options, op_key, update_op_value);
-        instance->PauseTimer(10);
-        if (!status.ok()) {
-          ++wrong_ops;
-        }
-        break;
-      }
-      case INSERT: {
-        instance->StartTimer(10);
-        string insert_tmp_max_key = to_string(++max_uint_key);
-        string insert_op_key = generate_key2(insert_tmp_max_key);
-        string insert_op_value = generate_value(uniform_dist_value(e2));
-        status = db->Put(write_options, insert_op_key, insert_op_value);
-        instance->PauseTimer(10);
-        if (!status.ok()) {
-          ++wrong_ops;
-        }
-        break;
-      }
-      case SCAN: {
-        instance->StartTimer(17);
-        leveldb::Iterator *db_iter = db->NewIterator(read_options);
-        vector<string> scan_result_vector;
-        db_iter->Seek(op_key);
-        for (int j = 0; db_iter->Valid() && j < scan_len; ++j) {
-          string get_result;
-          string get_key = db_iter->key().ToString();
-          db->Get(read_options, get_key, &get_result);
-          scan_result_vector.push_back(get_result);
-          db_iter->Next();
-        }
-        delete db_iter;
-        instance->PauseTimer(17);
-        break;
-      }
-      case READMODIFYWRITE: {
-        // read
-        instance->StartTimer(4);
-        string read_op_value;
-        status = db->Get(read_options, op_key, &read_op_value);
-        instance->PauseTimer(4);
-        if (!status.ok()) {
-          ++wrong_ops;
-          break;
-        }
-        // modify
-        string write_op_value = generate_value(uniform_dist_value(e2));
-        // write
-        instance->StartTimer(10);
-        status = db->Put(write_options, op_key, write_op_value);
-        instance->PauseTimer(10);
-        if (!status.ok()) {
-          ++wrong_ops;
-        }
-        break;
-      }
-      default: {
-        std::cerr << "Operation request is not recognized. Aborting...\n";
-        exit(EXIT_FAILURE);
-      }
+  // for (int i = 0; i < num_operations; ++i) {
+  string line, read_op_value;
+  while (std::getline(file, line)) {
+    instance->StartTimer(4);
+    status = db->Get(read_options, line, &read_op_value);
+    instance->PauseTimer(4);
+    if (!status.ok()) {
+      ++wrong_ops;
     }
-  
-    instance->PauseTimer(13, false);
   }
+  // }
+
+  instance->PauseTimer(13, false);
 
   cout << "Correct : " << num_operations << " Wrong : " << wrong_ops << " Wrong ratio : " << (double)wrong_ops / (double)num_operations << endl;
 
@@ -698,50 +582,36 @@ int main(int argc, char *argv[]) {
   adgMod::db->WaitForBackground();
   sleep(2);
 
-  // if (print_timestamps) {
-  //   cout << "\n===== Reporting events =====\n";
-  //   for (auto& event_array : events) {
-  //     for (Event* e : event_array) e->Report();
-  //   }
+  if (print_timestamps) {
+    cout << "\n===== Reporting events =====\n";
+    for (auto& event_array : events) {
+      for (Event* e : event_array) e->Report();
+    }
 
-  //   cout << "\n===== Reporting levelled counters =====\n";
-  //   for (Counter& c : levelled_counters) c.Report();
+    cout << "\n===== Reporting levelled counters =====\n";
+    for (Counter& c : levelled_counters) c.Report();
 
-  //   cout << "\n===== Reporting file data =====\n";
+    cout << "\n===== Reporting file data =====\n";
     file_data->Report();
 
-  //   cout << "\n===== Level model stats =====" << endl;
-  //   Version* current = adgMod::db->versions_->current();
-  //   for (int i = 1; i < config::kNumLevels; ++i) {
-  //     current->learned_index_data_[i]->ReportStats();
-  //   }
+    cout << "\n===== Level model stats =====" << endl;
+    Version* current = adgMod::db->versions_->current();
+    for (int i = 1; i < config::kNumLevels; ++i) {
+      current->learned_index_data_[i]->ReportStats();
+    }
 
-  //   cout << "\n===== Report file stats =====" << endl;
-  //   for (auto it : file_stats) {
-  //     printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
-  //       it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
-  //   }
+    cout << "\n===== Report file stats =====" << endl;
+    for (auto it : file_stats) {
+      printf("FileStats %d %d %lu %lu %u %u %lu %d\n", it.first, it.second.level, it.second.start,
+        it.second.end, it.second.num_lookup_pos, it.second.num_lookup_neg, it.second.size, it.first < file_data->watermark ? 0 : 1);
+    }
 
-  //   cout << "\n===== Report learn CB model =====" << endl;
-  //   adgMod::learn_cb_model->Report();
-  // }
+    cout << "\n===== Report learn CB model =====" << endl;
+    adgMod::learn_cb_model->Report();
+  }
 
   adgMod::db->WaitForBackground();
   delete db;
-  // }
-
-  // for (int s = 0; s < times.size(); ++s) {
-  //   vector<uint64_t>& time = times[s];
-  //   vector<double> diff(time.size());
-  //   if (time.empty()) continue;
-
-  //   double sum = std::accumulate(time.begin(), time.end(), 0.0);
-  //   double mean = sum / time.size();
-  //   std::transform(time.begin(), time.end(), diff.begin(), [mean] (double x) { return x - mean; });
-  //   double stdev = std::sqrt(std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0) / time.size());
-
-  //   printf("Timer %d MEAN: %lu, STDDEV: %f\n", s, (uint64_t) mean, stdev);
-  // }
 
   return 0;
 }

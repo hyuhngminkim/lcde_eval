@@ -97,7 +97,7 @@ bool LearnedIndexData::Learn() {
   // actual training
 #ifdef LCDE
   lcde::BuilderObject<uint64_t> bo = lcde::BuilderObject<uint64_t>(ko);
-  std::vector<double> params = {1, 100};
+  std::vector<double> params = {1, 100, 1};
   bo.build(string_keys, params);
   learned.store(true);
 
@@ -186,7 +186,7 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
     learn_counter_mutex.Unlock();
   }
 
-  if (!fresh_write) delete mas->meta;
+  // if (!fresh_write) delete mas->meta;
   delete mas;
   return entered ? time.second - time.first : 0;
 }
@@ -648,7 +648,7 @@ void FileLearnedIndexData::Report() {
   for (size_t i = 0; i < file_learned_index_data.size(); ++i) {
     auto pointer = file_learned_index_data[i];
     if (pointer != nullptr && pointer->cost != 0) {
-      printf("FileModel %lu %d \n", i, i > watermark);
+      // printf("FileModel %lu %d \n", i, i > watermark);
       accumulated_file_model_size += pointer->ReportStats();
     }
   }
